@@ -3,6 +3,7 @@ import collections
 import functools
 import itertools
 import os
+import pathlib
 import random
 import signal
 import string
@@ -12,30 +13,28 @@ import textwrap
 import time
 import tty
 
-WORDS_PATH = '/usr/share/dict/words'
-
-with open(WORDS_PATH, 'r') as f:
-    words = f.read().splitlines()
-
 ascii_letters = set(string.ascii_letters)
-
-usable_words = list(set(word.lower() for word in words if not (set(word) - ascii_letters)))
 
 printable = set(string.printable)
 
 codes = {
     'clear': '\x1b[H\x1b[2J\x1b[3J',
     'back': '\x7f',
-    'color': '\x1b[{back};2;{r};{g};{b}m{char}\x1b[0m',
+    'color_start': '\x1b[38;2;{r};{g};{b}m',
+    'color_end': '\x1b[0m',
     'cursor_invisible': '\x1b[?25l',
     'cursor_visible': '\x1b[?12l\x1b[?25h',
     'underline': '\x1b[4m{char}\x1b[0m'
 }
 
 
-def pixel(char, r, g, b, back=False):
-    back = [38, 48][back]
-    return codes['color'].format(back=back, r=r, g=g, b=b, char=char)
+def usable_words():
+    words_path = pathlib.Path('/usr/share/dict/words')
+    if not words_path.exists():
+        print(f'Could not find words to use')
+        exit(0)
+    words = words_path.read_text().splitlines()
+    return list(set(word.lower() for word in words if not (set(word) - ascii_letters)))
 
 
 class Sentence:
@@ -43,31 +42,29 @@ class Sentence:
     _pad = ' '
 
     def __init__(self, length=15):
-        self._remain = collections.deque(' '.join(random.choices(usable_words, k=length)))
+        self._remain = collections.deque(' '.join(random.choices(usable_words(), k=length)))
         self._len = len(self._remain)
-        self._success = ''
+        self._success = []
         self._errors = []
         self.update_width()
 
     def __repr__(self):
         text = ''.join(itertools.chain(self._success, self._errors, self._remain))
         wrapped = textwrap.wrap(text, width=self._width, expand_tabs=False, drop_whitespace=False)
-        s_cur = len(self._success)
-        e_cur = s_cur + len(self._errors)
-        u = s_cur if s_cur == e_cur else e_cur - 1
-        final, count = ['\n\n'], 0
+        errors = len(self._success) + len(self._errors)
+        final, count = ['\n\n', codes['color_start'].format(r=100, g=102, b=105)], 0
         for sen in wrapped:
             final.append(self._pad)
             for w in sen:
-                if count < s_cur:
-                    cur = pixel(w, 100, 102, 105)
-                elif count < e_cur:
-                    cur = pixel(w, 217, 4, 82)
-                else:
-                    cur = w
-                final.append(cur if count != u else codes['underline'].format(char=cur))
+                if count == len(self._success) and len(self._errors):
+                    final.append(codes['color_start'].format(r=217, g=4, b=82))
+                elif count == errors:
+                    final.append(codes['color_end'])
+                    w = codes['underline'].format(char=w)
+                final.append(w)
                 count += 1
             final.append('\n')
+        final.append(codes['color_end'])
         return ''.join(final)
 
     def __len__(self):
@@ -87,7 +84,7 @@ class Sentence:
         cls._pad = ' ' * int((term_len * 0.2) // 2)
 
     def success(self):
-        self._success += self._remain.popleft()
+        self._success.append(self._remain.popleft())
 
     @property
     def errors(self):
