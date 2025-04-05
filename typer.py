@@ -98,13 +98,9 @@ class Sentence:
 
 
 def refresh(out):
-    t0 = time.time()
-    out_repr = repr(out)
-    t1 = time.time() - t0
     sys.stdout.write(codes['clear'])
-    sys.stdout.write(out_repr)
+    sys.stdout.write(repr(out))
     sys.stdout.flush()
-    print(f'repr: {t1}', f'raw: {out_repr!r}')
 
 
 def resize(out, *_):
@@ -112,7 +108,7 @@ def resize(out, *_):
     refresh(out)
 
 
-def main():
+def main(words):
     stdin_fd = sys.stdin.fileno()
     try:
         old_settings = termios.tcgetattr(stdin_fd)
@@ -120,8 +116,7 @@ def main():
         print(f'This terminal is not supported: {e}')
         exit(0)
     try:
-        while not (inp := input('Enter word amount: ') or '15').isdigit() or not (num := int(inp)): pass
-        sentence = Sentence(num)
+        sentence = Sentence(words)
         tty.setcbreak(stdin_fd)
         print(codes['cursor_invisible'])
         refresh(sentence)
@@ -143,16 +138,11 @@ def main():
                 count_raw += 1
                 refresh(sentence)
         total_time /= 60
-        print('\nRWPM: ', rwpm := round(count_raw / 5 / total_time, 1))
+        print('\nRaw Words/Minute: ', rwpm := round(count_raw / 5 / total_time, 1))
         print('Accuracy: ', acc := round(len(sentence) / count_raw * 100, 1))
-        print('WPM: ', round(rwpm * acc / 100, 1))
+        print('Words/Minute: ', round(rwpm * acc / 100, 1))
     except(KeyboardInterrupt, SystemExit):
-        print('\nExiting gracefully...')
+        print('\nExiting typer...')
     finally:
         termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_settings)
         print(codes['cursor_visible'])
-    return main() if input().lower() == 'y' else None
-
-
-if __name__ == '__main__':
-    main()
