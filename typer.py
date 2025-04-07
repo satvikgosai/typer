@@ -18,12 +18,13 @@ ascii_letters = set(string.ascii_letters)
 printable = set(string.printable)
 
 codes = {
-    'clear': '\x1b[H\x1b[2J\x1b[3J',
+    'clear': '\x1b[2J\x1b[3J',
     'back': '\x7f',
     'color_start': '\x1b[38;2;{r};{g};{b}m',
     'color_end': '\x1b[0m',
     'cursor_invisible': '\x1b[?25l',
     'cursor_visible': '\x1b[?12l\x1b[?25h',
+    'cursor_start': '\x1b[H',
     'underline': '\x1b[4m{char}\x1b[0m'
 }
 
@@ -39,20 +40,25 @@ def usable_words():
 
 class Sentence:
     _width = 100
+    _height = 15
+    _lines = 0
+    _tmp_lines = 0
     _pad = ' '
+    _cover = ' '
 
     def __init__(self, length=15):
         self._remain = collections.deque(' '.join(random.choices(usable_words(), k=length)))
         self._len = len(self._remain)
         self._success = []
         self._errors = []
-        self.update_width()
+        self.refresh_dimensions()
 
     def __repr__(self):
         text = ''.join(itertools.chain(self._success, self._errors, self._remain))
         wrapped = textwrap.wrap(text, width=self._width, expand_tabs=False, drop_whitespace=False)
         errors = len(self._success) + len(self._errors)
         final, count = ['\n\n', codes['color_start'].format(r=100, g=102, b=105)], 0
+        self._tmp_lines = 2
         for sen in wrapped:
             final.append(self._pad)
             for w in sen:
@@ -64,6 +70,7 @@ class Sentence:
                 final.append(w)
                 count += 1
             final.append('\n')
+            self._tmp_lines += 1
         final.append(codes['color_end'])
         return ''.join(final)
 
@@ -78,10 +85,13 @@ class Sentence:
         return self._remain[0]
 
     @classmethod
-    def update_width(cls):
-        term_len = os.get_terminal_size().columns
-        cls._width = int((term_len * 0.8))
-        cls._pad = ' ' * int((term_len * 0.2) // 2)
+    def refresh_dimensions(cls):
+        print(codes['clear'])
+        term_size = os.get_terminal_size()
+        cls._height = term_size.lines
+        cls._width = int((term_size.columns * 0.8))
+        cls._pad = ' ' * int((term_size.columns * 0.2) // 2)
+        cls._cover = cls._pad + (' ' * cls._width)
 
     def success(self):
         self._success.append(self._remain.popleft())
@@ -97,14 +107,19 @@ class Sentence:
         self._errors.append(val)
 
 
-def refresh(out):
-    sys.stdout.write(codes['clear'])
-    sys.stdout.write(repr(out))
+def refresh(cls):
+    output_data = repr(cls)
+    if cls._lines < cls._height:
+        clear_data = codes['cursor_start'] + '\n'.join(cls._cover for _ in range(cls._lines))
+    else:
+        clear_data = codes['clear']
+    sys.stdout.write(clear_data + codes['cursor_start'] + output_data)
     sys.stdout.flush()
+    cls._lines = cls._tmp_lines
 
 
 def resize(out, *_):
-    Sentence.update_width()
+    Sentence.refresh_dimensions()
     refresh(out)
 
 
