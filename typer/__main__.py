@@ -1,7 +1,9 @@
-from typer import main
+import argparse
+
+from .typer import run
 
 
-def parse_num_words_arg(arg):
+def parse_num_words_arg(arg: str) -> int:
     if not arg.isdigit():
         raise argparse.ArgumentTypeError("number of words must be integer")
     num_words = int(arg)
@@ -10,7 +12,7 @@ def parse_num_words_arg(arg):
     return num_words
 
 
-def parse_max_word_length_arg(arg):
+def parse_max_word_length_arg(arg: str) -> int:
     if not arg.isdigit():
         raise argparse.ArgumentTypeError("maximum word length must be integer")
     max_word_length = int(arg)
@@ -19,9 +21,7 @@ def parse_max_word_length_arg(arg):
     return max_word_length
 
 
-if __name__ == "__main__":
-    import argparse
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Typing practice CLI application")
     parser.add_argument(
         '-n', '--num-words',
@@ -37,4 +37,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main(args.num_words, args.max_word_length)
+    run(args.num_words, args.max_word_length)
+
+
+if __name__ == "__main__":
+    main()
