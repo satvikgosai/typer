@@ -29,13 +29,13 @@ codes = {
 }
 
 
-def usable_words():
+def usable_words(max_word_length=8):
     words_path = pathlib.Path('/usr/share/dict/words')
     if not words_path.exists():
         print(f'Could not find words to use')
         exit(0)
     words = words_path.read_text().splitlines()
-    return list(set(word.lower() for word in words if not (set(word) - ascii_letters)))
+    return [word.lower() for word in words if len(word) <= max_word_length and not (set(word) - ascii_letters)]
 
 
 class Sentence:
@@ -46,8 +46,8 @@ class Sentence:
     _pad = ' '
     _cover = ' '
 
-    def __init__(self, length=15):
-        self._remain = collections.deque(' '.join(random.choices(usable_words(), k=length)))
+    def __init__(self, num_words=15, max_word_length=8):
+        self._remain = collections.deque(' '.join(random.choices(usable_words(max_word_length), k=num_words)))
         self._len = len(self._remain)
         self._success = []
         self._errors = []
@@ -56,18 +56,18 @@ class Sentence:
     def __repr__(self):
         text = ''.join(itertools.chain(self._success, self._errors, self._remain))
         wrapped = textwrap.wrap(text, width=self._width, expand_tabs=False, drop_whitespace=False)
-        errors = len(self._success) + len(self._errors)
+        success_errors = len(self._success) + len(self._errors)
+        underline = success_errors - 1 if self.errors else success_errors
         final, count = ['\n\n', codes['color_start'].format(r=100, g=102, b=105)], 0
         self._tmp_lines = 2
         for sen in wrapped:
             final.append(self._pad)
             for w in sen:
-                if count == len(self._success) and len(self._errors):
+                if count == len(self._success) and self.errors:
                     final.append(codes['color_start'].format(r=217, g=4, b=82))
-                elif count == errors:
+                elif count == success_errors:
                     final.append(codes['color_end'])
-                    w = codes['underline'].format(char=w)
-                final.append(w)
+                final.append(codes['underline'].format(char=w) if count == underline else w)
                 count += 1
             final.append('\n')
             self._tmp_lines += 1
@@ -123,7 +123,7 @@ def resize(out, *_):
     refresh(out)
 
 
-def main(words):
+def main(num_words, max_word_length):
     stdin_fd = sys.stdin.fileno()
     try:
         old_settings = termios.tcgetattr(stdin_fd)
@@ -131,7 +131,7 @@ def main(words):
         print(f'This terminal is not supported: {e}')
         exit(0)
     try:
-        sentence = Sentence(words)
+        sentence = Sentence(num_words, max_word_length)
         tty.setcbreak(stdin_fd)
         print(codes['cursor_invisible'])
         refresh(sentence)
@@ -154,7 +154,7 @@ def main(words):
                 refresh(sentence)
         total_time /= 60
         print('\nRaw Words/Minute: ', rwpm := round(count_raw / 5 / total_time, 1))
-        print('Accuracy: ', acc := round(len(sentence) / count_raw * 100, 1))
+        print('Accuracy: ', acc := round(len(sentence) / count_raw * 100, 1), '%')
         print('Words/Minute: ', round(rwpm * acc / 100, 1))
     except(KeyboardInterrupt, SystemExit):
         print('\nExiting typer...')
