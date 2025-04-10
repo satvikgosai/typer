@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "typer"
+version = "0.1.0"
+requires-python = ">=3.6"
+description = "A typing practice application"
+authors = [
+    { name = "Satvik Gosai", email = "136249990+satvikgosai@users.noreply.github.com" }
+]
+readme = "README.md"
+
+[project.urls]
+repository = "https://github.com/satvikgosai/typer"
+
+[tool.setuptools]
+packages = ["typer"]
+
+[project.scripts]
+typer = "typer.__main__:main"
