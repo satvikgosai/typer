@@ -20,6 +20,8 @@ printable: Set[str] = set(string.printable)
 codes: Dict[str, str] = {
     'clear': '\x1b[2J\x1b[3J',
     'back': '\x7f',
+    'tab': '\x09',
+    'enter': '\x0a',
     'color_start': '\x1b[38;2;{r};{g};{b}m',
     'color_end': '\x1b[0m',
     'cursor_invisible': '\x1b[?25l',
@@ -145,11 +147,19 @@ def run(num_words: int, max_word_length: int) -> None:
         refresh(sentence)
         signal.signal(signal.SIGWINCH, functools.partial(resize, sentence))
         count_raw = total_time = 0
+        restart = False
 
         while sentence:
             t0 = time.time()
             ch = os.read(stdin_fd, 80).decode("utf-8", errors="ignore")
             total_time += (time.time() - t0) if count_raw else 0
+
+            if restart:
+                if ch == codes['enter']:
+                    return run(num_words, max_word_length)
+                restart = False
+            if ch == codes['tab']:
+                restart = True
 
             if ch == codes['back']:
                 if sentence.errors:
@@ -168,6 +178,9 @@ def run(num_words: int, max_word_length: int) -> None:
         print('Accuracy: ', acc := round(len(sentence) / count_raw * 100, 1), '%')
         print('Words/Minute: ', round(rwpm * acc / 100, 1))
 
+        if input().strip(' ') == codes['tab']:
+            run(num_words, max_word_length)
+
     except (KeyboardInterrupt, SystemExit):
         print('\nExiting typer...')
     except Exception as e:
@@ -175,6 +188,6 @@ def run(num_words: int, max_word_length: int) -> None:
     finally:
         try:
             termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_settings)
-            print(codes['cursor_visible'])
+            print(codes['cursor_visible'], end='')
         except Exception as e:
             print(f'Error restoring terminal settings: {e}')
